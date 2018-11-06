@@ -18,7 +18,7 @@ TOKEN = os.getenv("TOKEN")
 
 class BooketbyBot:
     def __init__(self, token):
-        self.session = init_session('sqlite', os.path.join(os.getcwd(), "db/db.sqlite3"))
+        self.session = init_session('sqlite', os.path.join(os.getcwd(), "db/db.sqlite3"))()
         self.updater = Updater(token=token)
         self.intervalJob = self.updater.job_queue.run_repeating(
             self.intervalJobCallback,
