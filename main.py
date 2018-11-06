@@ -5,12 +5,13 @@ import requests
 from dotenv import load_dotenv
 from models import init_session, Subscriber
 
+from telegram import ParseMode
 from telegram.ext import (
     Updater,
     CommandHandler
 )
 
-logging.basicConfig(filename="./log/production.log", format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(filename="./log/production.log", format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 load_dotenv()
 
@@ -32,26 +33,28 @@ class BooketbyBot:
 
     def getBooketStatus(self):
         response = requests.get('https://booket.by')
-        return response.status_code
+        status = response.status_code
+        if status == 200:
+            logging.log(logging.INFO, "booket.by status checked, no problems were found")
+        else:
+            logging.log(logging.WARNING, f"Something went wrong, status code: {status}")
+        return status
 
     def intervalJobCallback(self, bot, job):
         status = self.getBooketStatus()
         if status != 200:
-            logging.log(logging.WARNING, f"Something went wrong, status code: {status}")
             for user in self.session.query(Subscriber):
                 if user.subs_type == 'default':
                     pass
                 elif user.subs_type == 'silent':
-                    bot.send_message(user.id, f"Something went wrong, status code: `{status}`")
-        else:
-            logging.log(logging.INFO, "booket.by status checked, no problems were found")
+                    bot.send_message(user.id, f"Something went wrong, status code: `{status}`", parse_mode=ParseMode.MARKDOWN)
 
     def statusCallback(self, bot, update):
         chat_id = update.message.chat_id
         bot.send_message(chat_id=chat_id, text="Checking booket.by status...")
         status = self.getBooketStatus()
         message = "Ok." if status == 200 else f"Something went wrong, status code: `{status}`"
-        bot.send_message(chat_id=chat_id, text=message)
+        bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.MARKDOWN)
 
     def subscribeCallback(self, bot, update):
         chat_id = update.message.chat_id
@@ -74,7 +77,7 @@ class BooketbyBot:
             for user in self.session.query(Subscriber).filter(Subscriber.id == chat_id):
                 user.subs_type = 'disabled'
                 self.session.commit()
-            bot.send_message(chat_id=chat_id, text="Successfully subscribed on status updates")
+            bot.send_message(chat_id=chat_id, text="Successfully unsubscribed from status updates")
         except:
             logging.log(logging.ERROR, f"Error during subscriber deleting: {sys.exc_info()[0]}")
             raise
@@ -90,7 +93,7 @@ class BooketbyBot:
         self.missingFunctionCallback(bot, update)
 
     def pingCallback(self, bot, update):
-        self.missingFunctionCallback(bot, update)
+        bot.send_message(update.message.chat_id, "Pingback", reply_to_message_id=update.message.message_id)
 
     def missingFunctionCallback(self, bot, update):
         bot.send_message(update.message.chat_id, "This function is not avaliable now.")
@@ -112,12 +115,12 @@ def main():
     if TOKEN != None:
         bot = BooketbyBot(TOKEN)
         bot.run()
+        print('Bot is running...\nPress Ctrl + C to exit')
     else:
         print("TOKEN has not been provided!")
 
 if __name__ == '__main__':
     try:
-        print('Bot is running...\nPress Ctrl + C to exit')
         main()
     except KeyboardInterrupt:
         exit()
