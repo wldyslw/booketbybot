@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, create_engine
-from sqlalchemy.orm import validates, sessionmaker
+from sqlalchemy.orm import validates, sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -30,4 +30,4 @@ def init_session(db_type, db_path):
     engine = create_engine(connection, echo=True)
     Session = sessionmaker(bind=engine)
     Base.metadata.create_all(engine)
-    return Session()
+    return scoped_session(Session)
