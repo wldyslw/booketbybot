@@ -18,8 +18,13 @@ TOKEN = os.getenv("TOKEN")
 
 class BooketbyBot:
     def __init__(self, token):
-        self.updater = Updater(token=token)
         self.session = init_session('sqlite', os.path.join(os.getcwd(), "db/db.sqlite3"))
+        self.updater = Updater(token=token)
+        self.intervalJob = self.updater.job_queue.run_repeating(
+            self.intervalJobCallback,
+            interval=60,
+            first=0
+        )
 
         handlers = self.initHandlers()
         for handler in handlers:
@@ -28,6 +33,18 @@ class BooketbyBot:
     def getBooketStatus(self):
         response = requests.get('https://booket.by')
         return response.status_code
+
+    def intervalJobCallback(self, bot, job):
+        status = self.getBooketStatus()
+        if status != 200:
+            logging.log(logging.WARNING, f"Something went wrong, status code: {status}")
+            for user in self.session.query(Subscriber):
+                if user.subs_type == 'default':
+                    pass
+                elif user.subs_type == 'silent':
+                    bot.send_message(user.id, f"Something went wrong, status code: `{status}`")
+        else:
+            logging.log(logging.INFO, "booket.by status checked, no problems were found")
 
     def statusCallback(self, bot, update):
         chat_id = update.message.chat_id
