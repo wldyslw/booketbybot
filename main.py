@@ -26,6 +26,8 @@ class BooketbyBot:
             interval=60,
             first=0
         )
+        self.status = 200
+        self.notifierStatus = False
 
         handlers = self.initHandlers()
         for handler in handlers:
@@ -33,27 +35,29 @@ class BooketbyBot:
 
     def getBooketStatus(self):
         response = requests.get('https://booket.by')
-        status = response.status_code
-        if status == 200:
+        self.status = response.status_code
+        if self.status == 200:
+            if self.notifierStatus:
+                self.notifierStatus = False
             logging.log(logging.INFO, "booket.by status checked, no problems were found")
         else:
-            logging.log(logging.WARNING, f"Something went wrong, status code: {status}")
-        return status
+            logging.log(logging.WARNING, f"Something went wrong, status code: {self.status}")
+        return self.status
 
     def intervalJobCallback(self, bot, job):
-        status = self.getBooketStatus()
-        if status != 200:
+        self.getBooketStatus()
+        if self.status != 200 and not self.notifierStatus:
             for user in self.session.query(Subscriber):
                 if user.subs_type == 'default':
                     pass
                 elif user.subs_type == 'silent':
-                    bot.send_message(user.id, f"Something went wrong, status code: `{status}`", parse_mode=ParseMode.MARKDOWN)
+                    bot.send_message(user.id, f"Something went wrong, status code: `{self.status}`", parse_mode=ParseMode.MARKDOWN)
+            self.notifierStatus = True
 
     def statusCallback(self, bot, update):
         chat_id = update.message.chat_id
         bot.send_message(chat_id=chat_id, text="Checking booket.by status...")
-        status = self.getBooketStatus()
-        message = "Ok." if status == 200 else f"Something went wrong, status code: `{status}`"
+        message = "Ok." if self.status == 200 else f"Something went wrong, status code: `{self.status}`"
         bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.MARKDOWN)
 
     def subscribeCallback(self, bot, update):
